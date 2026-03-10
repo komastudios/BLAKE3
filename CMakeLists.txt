@@ -45,8 +45,11 @@ set(BLAKE3_X86_NAMES i686 x86 X86)
 set(BLAKE3_ARMv8_NAMES aarch64 AArch64 arm64 ARM64 armv8 armv8a)
 
 # Determine BLAKE3_ARCH
+# Emscripten reports x86 but doesn't support x86 SIMD — use portable only
+if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+    # BLAKE3_ARCH left unset — portable fallback
 # On Apple, check CMAKE_OSX_ARCHITECTURES first (cross-compile target vs host)
-if(APPLE AND DEFINED CMAKE_OSX_ARCHITECTURES AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL "")
+elseif(APPLE AND DEFINED CMAKE_OSX_ARCHITECTURES AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL "")
     string(TOLOWER "${CMAKE_OSX_ARCHITECTURES}" _osx_arch_lower)
     if(_osx_arch_lower MATCHES "x86_64")
         set(BLAKE3_ARCH "amd64")
