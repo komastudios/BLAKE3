@@ -10,6 +10,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED "Build shared library" ON)
 option(USE_MSVC_STATIC_RUNTIME "Use MSVC static runtime" OFF)
 
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
+    add_compile_options("-fdebug-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+    add_compile_options("/Brepro")
+    add_link_options("/Brepro")
+    add_compile_options("/pathmap:${CMAKE_CURRENT_SOURCE_DIR}=.")
+endif()
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     set(BUILD_SHARED OFF)
 
