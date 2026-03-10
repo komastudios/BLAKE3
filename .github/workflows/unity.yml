@@ -32,22 +32,25 @@ jobs:
           - name: "Linux (GCC)"
             artifact: "linux-x64"
             os: ubuntu-22.04
+            test: true
           - name: "macOS (Clang)"
             artifact: "macos-universal"
-            os: macos-15
-            universal: true
-            xcode: '16.4'
+            os: macos-14
+            flags: "-GXcode -DCMAKE_OSX_ARCHITECTURES='arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13"
+            test: true
           - name: "Windows (MSVC)"
             artifact: "windows-x64"
             os: windows-2022
             shell: pwsh
             flags: "-A x64 -DUSE_MSVC_STATIC_RUNTIME=ON"
+            test: true
           - name: "Windows (GCC)"
             artifact: "windows-x64-mingw"
             os: windows-2022
             shell: 'msys2 {0}'
             msystem: mingw64
             msys-env: mingw-w64-x86_64
+            test: true
 
           # --- Android ---
           - name: Android (arm64-v8a)
@@ -131,42 +134,8 @@ jobs:
         with:
           version: 3.1.8
 
-      - name: Configure CMake (arm64 - Universal)
-        if: matrix.universal
-        run: cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -GXcode -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf
-
-      - name: Build (arm64 - Universal)
-        if: matrix.universal
-        run: cmake --build build-arm64 --config ${{env.BUILD_TYPE}}
-
-      - name: Install (arm64 - Universal)
-        if: matrix.universal
-        run: cmake --install build-arm64 --config ${{env.BUILD_TYPE}} --prefix dist-arm64
-
-      - name: Configure CMake (x86_64 - Universal)
-        if: matrix.universal
-        run: cmake -S . -B build-x86_64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -GXcode -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf
-
-      - name: Build (x86_64 - Universal)
-        if: matrix.universal
-        run: cmake --build build-x86_64 --config ${{env.BUILD_TYPE}}
-
-      - name: Install (x86_64 - Universal)
-        if: matrix.universal
-        run: cmake --install build-x86_64 --config ${{env.BUILD_TYPE}} --prefix dist-x86_64
-
-      - name: Create universal binary
-        if: matrix.universal
-        run: |
-          mkdir -p dist/lib dist/include
-          lipo -create dist-arm64/lib/libblake3-static.a dist-x86_64/lib/libblake3-static.a -output dist/lib/libblake3-static.a
-          lipo -create dist-arm64/lib/libblake3.dylib dist-x86_64/lib/libblake3.dylib -output dist/lib/libblake3.dylib
-          cp dist-arm64/include/blake3.h dist/include/
-          lipo -info dist/lib/libblake3-static.a
-          lipo -info dist/lib/libblake3.dylib
-
       - name: Configure CMake (Standard)
-        if: "!matrix.android && !matrix.emscripten && !matrix.universal"
+        if: "!matrix.android && !matrix.emscripten"
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/dist ${{ matrix.flags }}
 
       - name: Configure CMake (Android)
@@ -185,11 +154,15 @@ jobs:
         run: emcmake cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        if: "!matrix.universal"
         run: cmake --build build --config Release
 
+      - name: Test
+        if: matrix.test
+        working-directory: build
+        run: ctest -C Release
+
       - name: Install (Standard)
-        if: "!matrix.ios && !matrix.universal"
+        if: "!matrix.ios"
         run: cmake --install build --config Release --prefix dist
 
       - name: Install (iOS)
