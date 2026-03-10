@@ -7,18 +7,25 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(BUILD_SHARED "Build shared library" ON)
 option(USE_MSVC_STATIC_RUNTIME "Use MSVC static runtime" OFF)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
+    set(BUILD_SHARED OFF)
+
     set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
     set(CMAKE_C_FLAGS_RELEASE "-O2 -g1 -DNDEBUG")
 
     add_compile_options(-fsigned-char)
     add_link_options("-Wl,-z,max-page-size=16384")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+    set(BUILD_SHARED OFF)
+
     set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
     set(CMAKE_C_FLAGS_RELEASE "-O2 -g1 -DNDEBUG")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+    set(BUILD_SHARED OFF)
+
     set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
     set(CMAKE_C_FLAGS_RELEASE "-O2 -g1 -DNDEBUG")
 endif()
@@ -133,25 +140,41 @@ elseif(BLAKE3_ARCH STREQUAL "armv7")
     set_source_files_properties(c/blake3_neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon")
 endif()
 
-# Library target
-add_library(blake3 STATIC ${LIB_SOURCE_FILES})
-target_include_directories(blake3 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/c)
+# Library target function (mirrors lz4 pattern)
+function(add_blake3_library TARGET_NAME LIB_TYPE)
+    add_library(${TARGET_NAME} ${LIB_TYPE} ${LIB_SOURCE_FILES})
+    target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/c)
+    set_property(TARGET ${TARGET_NAME} PROPERTY C_VISIBILITY_PRESET hidden)
 
-if(BLAKE3_ARCH STREQUAL "armv7")
-    target_compile_definitions(blake3 PRIVATE BLAKE3_USE_NEON=1)
-elseif(NOT DEFINED BLAKE3_ARCH OR BLAKE3_ARCH STREQUAL "")
-    target_compile_definitions(blake3 PRIVATE
-        BLAKE3_USE_NEON=0
-        BLAKE3_NO_SSE2
-        BLAKE3_NO_SSE41
-        BLAKE3_NO_AVX2
-        BLAKE3_NO_AVX512)
-endif()
+    if(BLAKE3_ARCH STREQUAL "armv7")
+        target_compile_definitions(${TARGET_NAME} PRIVATE BLAKE3_USE_NEON=1)
+    elseif(NOT DEFINED BLAKE3_ARCH OR BLAKE3_ARCH STREQUAL "")
+        target_compile_definitions(${TARGET_NAME} PRIVATE
+            BLAKE3_USE_NEON=0
+            BLAKE3_NO_SSE2
+            BLAKE3_NO_SSE41
+            BLAKE3_NO_AVX2
+            BLAKE3_NO_AVX512)
+    endif()
 
-install(TARGETS blake3
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin)
+    if(LIB_TYPE STREQUAL "SHARED")
+        if(WIN32)
+            target_compile_definitions(${TARGET_NAME} PRIVATE BLAKE3_DLL_EXPORTS)
+            target_compile_definitions(${TARGET_NAME} PUBLIC BLAKE3_DLL)
+        endif()
+    endif()
+
+    install(TARGETS ${TARGET_NAME}
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
+endfunction()
+
+add_blake3_library(blake3-static STATIC)
 
 install(FILES c/blake3.h
     DESTINATION include)
+
+if(BUILD_SHARED)
+    add_blake3_library(blake3 SHARED)
+endif()

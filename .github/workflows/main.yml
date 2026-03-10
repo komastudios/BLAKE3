@@ -69,9 +69,11 @@ jobs:
       if: matrix.platform.universal
       run: |
         mkdir -p dist/lib dist/include
-        lipo -create dist-arm64/lib/libblake3.a dist-x86_64/lib/libblake3.a -output dist/lib/libblake3.a
+        lipo -create dist-arm64/lib/libblake3-static.a dist-x86_64/lib/libblake3-static.a -output dist/lib/libblake3-static.a
+        lipo -create dist-arm64/lib/libblake3.dylib dist-x86_64/lib/libblake3.dylib -output dist/lib/libblake3.dylib
         cp dist-arm64/include/blake3.h dist/include/
-        lipo -info dist/lib/libblake3.a
+        lipo -info dist/lib/libblake3-static.a
+        lipo -info dist/lib/libblake3.dylib
 
     - name: Configure CMake
       if: ${{ !matrix.platform.universal }}
